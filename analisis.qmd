@@ -1,0 +1,226 @@
+---
+  title: Ejercicio estadística descriptiva multivariante
+  author: Melcion Ciudad Bosch
+  date: today
+  format:
+    html:
+      theme: darkly  
+      toc: true
+      toc-depth: 3
+      highlight-style: zenburn
+  Rendering:
+      embed-resources: true 
+
+---
+
+**Enlace al repositorio de Git-Hub:** [repositorio](https://github.com/mcbosch/Analisis_empresa/tree/main)
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+# knitr es un paquet de R que serveix per dinamitzar i definir els chunks.
+# l'operador :: serveix per accedir a funcions d'un paquet fora haver de carregar un paquet sencer. Aquest operador serveix per evitar problemes amb funcions de diferents paquets amb el mateix nom
+```
+
+```{r}
+library(tidyverse)
+```
+## Enunciado y datos
+
+Una empresa quiere analizar si existe relación entre las ventas de sus productos, la inversión en publicidad y la satisfacción del cliente (y la marca). Los datos que corresponden a las ventas han sido registrados en miles de unidades, el gasto en publicidad en miles de euros y la puntuación de satisfacción del cliente en una escala de 1 a 10 para 30 productos, los puedes descargar en el siguiente enlace: [datos empresa](https://github.com/igmuib/Practica_AD/blob/main/datos_empresa.csv)
+
+## Lectura y limpieza de los datos
+
+```{r}
+datos <- read.csv('datos/datos_empresa.csv',header = TRUE)
+```
+Nos pasamos nuestros datos a una matriz donde cada fila correponde a un producto. Además nos pasamos nuestros valores como números para después poder trabajar con ellos y obtener valores como la varianza, media, la matriz de dispersión...
+
+```{r}
+a <- datos %>% select(2:5) %>% mutate(Marca = case_when(
+  .$Marca == 'Marca A' ~ 1,
+  .$Marca == 'Marca B' ~ 2,
+  .$Marca == 'Marca C' ~ 3)) %>% as.matrix()
+for (i in 1:4){
+  a[,4]<- as.numeric(a[,4])
+}
+```
+
+
+## Apartado 1
+
+Para el apartado 1 calulamos la matriz de dispersión con la función pairs()
+
+```{r}
+pairs(a,
+      col = c('red','blue','yellow')[a[,4]],
+      pch = 18)
+```
+
+Si consideramos la submatriz de 3x3 formada por Ventas-Publicidad-Satisfaccion_cliente podemos intuir que todas tendrán una correlación. Esto lo podemos observar con la función ggpairs del paquete GGally:
+
+```{r}
+g <- datos %>% select(2:5)
+GGally::ggpairs(g,
+                aes(color = Marca)) + 
+  scale_color_manual(values = c(
+    'Marca A' = 'red', 'Marca B' = 'blue', 'Marca C' = 'yellow')) + theme_minimal() +
+  labs(title = 'Matriz de dispersión con ggpairs', color = 'Marca')
+```
+Observamos que los valores de las correlaciones són positivos muy cercanos a 1. Esto significa que podemos aproximar nuestros valores muestrales se acercan mucho a ser una función lineal de la otra con una tendencia creciente.
+
+## Apartado 2
+
+Calcula la matriz de datos centrada y el vector de medias con las formas matriciales estudiada en clase de teoría. Interpreta el vector de medias en el contexto del problema.
+
+Para eso primero definimos la matriz de datos:
+
+```{r}
+mat_data <- datos %>% select(2:4) %>% as.matrix()
+dim(mat_data)
+```
+
+#### Matriz de datos centrada
+
+  1.  Calculamos el vector de medias:
+
+```{r}
+vect_mean = c(
+  m_ventas = mean(mat_data[,1]),
+  m_publi = mean(mat_data[,2]),
+  m_satis = mean(mat_data[,3])
+)
+vect_mean
+```
+
+Este vector nos da las medias de las ventas, la publicidad y la satisfacción, en este orden, de todos los productos estudiados sin tener en cuenta la marca.
+
+  2. Calculamos matriz de datos centrada
+  
+```{r}
+mat_cent <- as.matrix(cbind(
+  mat_data[,1]-vect_mean[1],
+  mat_data[,2]-vect_mean[2],
+  mat_data[,3]-vect_mean[3]
+))
+# enseñamos 5 filas:
+mat_cent[1:5,]
+```
+  
+## Apartado 3
+
+Calcula la matriz de covarianzas y la matriz de correlaciones utilizando las formas matriciales vistas en la clase de teoría. A continuación, interpreta los resultados obtenidos para ambas matrices en el contexto del problema.
+
+Obtendremos dos matrices 3x3. Para hacerlo de manera sencilla definimos las siguientes funciones para la matriz de la varianza y varianza muestral.
+
+  - **FUNCIONES PARA MATRIZ VARIANZA**
+```{r}
+covarianza <- function(X,Y){
+  n = length(X)
+  mx = mean(X)
+  my = mean(Y)
+  V = 0
+  for (i in 1:n){
+    V = V + (X[i]-mx)*(Y[i]-my)
+  }
+  V = V/n
+  return(V)
+}
+
+matriz_var <- function(M){
+  m = dim(M)[2]
+  n = dim(M)[1]
+  mat_V= matrix(rep(0,m*m),nrow = m)
+  for (i in 1:m){
+    for(j in 1:m){
+    mat_V[i,j] = covarianza(M[,i],M[,j])
+    }
+  }
+  return(mat_V)
+}
+```
+
+  - **FUNCIONES PARA MATRIZ VARIANZA MUESTRAL**
+```{r}
+covarianza_muestral <- function(X,Y){
+  n = length(X)
+  mx = mean(X)
+  my = mean(Y)
+  V = 0
+  for (i in 1:n){
+    V = V + (X[i]-mx)*(Y[i]-my)
+  }
+  V = V/(n-1)
+  return(V)
+}
+
+matriz_var_m <- function(M){
+  m = dim(M)[2]
+  n = dim(M)[1]
+  mat_V = matrix(rep(0,m*m),nrow = m)
+  for (i in 1:m){
+    for(j in 1:m){
+    mat_V[i,j] = covarianza_muestral(M[,i],M[,j])
+    }
+  }
+  return(mat_V)
+}
+```
+
+Y ahora calculamos las matrices.
+```{r, echo = FALSE}
+# matriz de varianzas
+
+mat_V = matriz_var(mat_data)
+print('Matriz varianza')
+mat_V
+```
+Calculamos ahora la matriz de correlaciones
+
+```{r,echo=FALSE}
+mat_C = mat_V
+for (i in 1:3){
+  for(j in 1:3){
+    mat_C[i,j] = mat_C[i,j]/sqrt(mat_V[i,i]*mat_V[j,j])
+  }
+}
+print('Matriz correlaciones')
+mat_C
+
+```
+
+## Apartado 4
+
+Calcula la matriz de correlaciones muestrales con la forma matricial estudiada en clase de teoría y revisa que lo has hecho bien con la función disponible de R. Interpreta los resultados obtenidos.
+
+
+Definimos la matriz de varianza y correlaciones muestrales:
+
+```{r,echo=FALSE}
+mat_V_m = matriz_var_m(mat_data)
+print('Matriz de varianza muestral nuestra vs R')
+mat_V_m
+var(mat_data)
+```
+Calculamos la de correlación:
+```{r, echo=FALSE}
+mat_C_m = mat_V_m
+for (i in 1:3){
+  for(j in 1:3){
+    mat_C_m[i,j] = mat_C_m[i,j]/sqrt(mat_V_m[i,i]*mat_V_m[j,j])
+  }
+}
+print('Matriz de correlación muestral nuestra vs R')
+
+mat_C_m
+cor(mat_data)
+
+```
+
+Como podemos observar en ambos casos los FALSE se deben a decimales que ni se muestran en pantalla (se deben utilizar métodos numéricos distintos y salen diferencias mínimas).
+
+
+
+## Apartado 5
+
+Calcula la varianza generalizada y la variación total del conjunto de datos numéricos que estamos estudiando. Interpreta los resultados obtenidos.
+
